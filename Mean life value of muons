@@ -1,0 +1,39 @@
+void mionhist()
+{
+	delete gROOT->FindObject("h1");
+	delete gROOT->FindObject("h3");
+	delete gROOT->FindObject("c1");
+	TCanvas *time = new TCanvas("c1", "mion", 100, 130, 800, 450);
+	TH1F *h1 = new TH1F("h1","h1",4096,0,4096); 
+	ifstream in; // data extraction
+	Float_t t;
+	Int_t nlines = 0;
+	in.open ("mion.dat", ios::in);
+	while (1) 
+	{
+		in >> t ;
+		if (!in.good()) break;
+		h1 -> Fill(t);
+		nlines++;
+	}
+	in.close ();
+	cout << "Extracted " << nlines << " samples, creating histogram...\n";
+	TH1 *h2 = h1 -> Rebin(128, "h2"); // creating histograms and rebinning data
+	int nbins = h2 -> GetXaxis() -> GetNbins();
+	TH1 *h3 = new TH1F("h3", "A histogram of detected muon decays", nbins, 0, 5);
+	for (int i = 1; i <= nbins; i++) 
+	{
+		double y = h2 -> GetBinContent(i);
+		double x = h2 -> GetXaxis () -> GetBinCenter(i);
+		double xnew = (5.0/4096.0)*x;
+		h3 -> Fill(xnew, y);
+		h3 -> SetBinError(i,0);
+		//cout << y << "\n";
+	}
+	TF1 fit1 ("fit1", "[0]*TMath::Exp(-x/[1])"); // fitting an exponential function to obtain the value for the mean life value
+	fit1.SetParameter(0, 100);
+	fit1.SetParameter(1, 2);
+	h3 -> GetXaxis() -> SetTitle("Time [#mus]");
+	h3 -> GetYaxis() -> SetTitle("Number of events");
+	h3 -> Fit("fit1", "RLE", "", 0.2, 4.7);
+}
