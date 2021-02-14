@@ -1,0 +1,168 @@
+struct Data //simplifies handling calibration data
+{
+	Int_t fitData[12];
+	TString name;
+
+	Data() {}
+
+	ClassDef(Data, 1)
+}sodium, cesium;
+
+
+
+void coeff(struct Data coeffData, Double_t* sred) //function to get the mean values of peaks for calibration
+{
+	TFile *f = new TFile(coeffData.name,"READ"); //check if file exists
+	if (f->IsZombie())
+	{	
+		cout << "Error opening file" <<	endl;
+		exit(-1);
+	}
+	TTree *pos;
+	Double_t polje[18] = {};
+	f->GetObject("data;1", pos); //no checks here because the data was expected to be this way
+	TF1* fit11 = new TF1("m1", "gaus", coeffData.fitData[0], coeffData.fitData[1]); //defining functions to get the peak energy in arbitrary units
+	TF1* fit12 = new TF1("m2", "gaus", coeffData.fitData[2], coeffData.fitData[3]);
+	TF1* fit21 = new TF1("m3", "gaus", coeffData.fitData[4], coeffData.fitData[5]);
+	TF1* fit22 = new TF1("m4", "gaus", coeffData.fitData[6], coeffData.fitData[7]);
+	TF1* fit31 = new TF1("m5", "gaus", coeffData.fitData[8], coeffData.fitData[9]);
+	TF1* fit32 = new TF1("m6", "gaus", coeffData.fitData[10], coeffData.fitData[11]);
+	pos->Draw("-analysis_ch1.intChargeTotal", "analysis_ch1.intChargeTotal<50000"); //creating a histogram
+	TH1F *nat1 = (TH1F*)gPad->GetPrimitive("htemp"); //extracting the histogram
+	nat1->Fit(fit11, "QR"); //fitting gaussians
+	nat1->Fit(fit12, "QR+");
+	fit11->GetParameters(&polje[0]);//extracting params
+	fit12->GetParameters(&polje[3]);
+	pos->Draw("-analysis_ch2.intChargeTotal", "-analysis_ch2.intChargeTotal<50000");
+	TH1F *nat2 = (TH1F*)gPad->GetPrimitive("htemp");
+	nat2->Fit(fit21, "QR");
+	nat2->Fit(fit22, "QR+");
+	fit21->GetParameters(&polje[6]);
+	fit22->GetParameters(&polje[9]);
+	pos->Draw("-analysis_ch3.intChargeTotal", "-analysis_ch3.intChargeTotal<50000");
+	TH1F *nat3 = (TH1F*)gPad->GetPrimitive("htemp");
+	nat3->Fit(fit31, "QR");
+	nat3->Fit(fit32, "QR+");
+	fit31->GetParameters(&polje[12]);
+	fit32->GetParameters(&polje[15]);
+	for(int i = 0; i < 6; i++)
+	{
+		sred[i]=polje[3*i+1];
+	}
+	f->Close();
+}
+
+void graph(TString fname, Double_t* par, TCanvas* board) // drawing the histograms for calibration data in proper energy units
+{	
+	char argument1 [50], argument2 [50], argument3 [50], name[50], nameel [50];
+	TFile *f = new TFile(fname,"READ");
+	if (f->IsZombie())
+	{	
+		cout << "Error opening file" <<	endl;
+		exit(-1);
+	}
+	if (fname == "22Na.root") sprintf(nameel, "Sodium");
+	else if (fname == "137Cs.root") sprintf(nameel, "Cesium");
+	else sprintf(nameel, "Positronium");
+	sprintf(argument1, "-analysis_ch1.intChargeTotal*%f+%f", par[0], par[1]);
+	sprintf(argument2, "-analysis_ch2.intChargeTotal*%f+%f", par[2], par[3]);
+	sprintf(argument3, "-analysis_ch3.intChargeTotal*%f+%f", par[4], par[5]);
+	TTree *pos;
+	f->GetObject("data;1", pos);
+	gStyle -> SetTitleH(0.1);
+	gStyle -> SetTitleW(0.25);
+	pos->Draw(argument1, "-analysis_ch1.intChargeTotal<20000 && -analysis_ch1.intChargeTotal>500");
+	TH1F *det1 = (TH1F*)gPad->GetPrimitive("htemp");
+	det1 -> GetXaxis() -> SetTitle("Energy [keV]"); //making the histogram look nice
+	det1 -> GetYaxis() -> SetTitle("Number of events");
+	det1 -> SetStats(0);
+	sprintf(name, "%s, detector 1", nameel);
+	det1 -> SetTitle(name);
+	det1 -> SetTitleSize(0.02, "t");
+	det1 -> SetFillColorAlpha(kBlue-10, 0.4);
+	sprintf(name, "%s1.pdf", nameel);
+	board->SaveAs(name); //saving to file
+	pos->Draw(argument2, "-analysis_ch2.intChargeTotal<25000 && -analysis_ch2.intChargeTotal>500");
+	TH1F *det2 = (TH1F*)gPad->GetPrimitive("htemp");
+	det2 -> GetXaxis() -> SetTitle("Energy [keV]");
+	det2 -> GetYaxis() -> SetTitle("Number of events");
+	det2 -> SetStats(0);
+	sprintf(name, "%s, detector 2", nameel);
+	det2 -> SetTitle(name);
+	det2 -> SetTitleSize(0.02, "t");
+	det2 -> SetFillColorAlpha(kBlue-10, 0.4);
+	sprintf(name, "%s2.pdf", nameel);
+	board -> SaveAs(name); 
+	pos->Draw(argument3, "-analysis_ch3.intChargeTotal<35000 && -analysis_ch3.intChargeTotal>500");
+	TH1F *det3 = (TH1F*) gPad->GetPrimitive("htemp");
+	det3 -> GetXaxis() -> SetTitle("Energy [keV]");
+	det3 -> GetYaxis() -> SetTitle("Number of events");
+	det3 -> SetStats(0);
+	sprintf(name, "%s, detector 3", nameel);
+	det3 -> SetTitle(name);
+	det3 -> SetTitleSize(0.02, "t");
+	det3 -> SetFillColorAlpha(kBlue-10, 0.4);
+	sprintf(name, "%s3.pdf", nameel);
+	board -> SaveAs(name);
+	f->Close();
+}
+
+void pgraph(TString fname, Double_t* par, TCanvas* board) //drawing the final histogram
+{
+	char argument [200];
+	TFile *f = new TFile(fname,"READ");
+	if (f->IsZombie())
+	{	
+		cout << "Error opening file" <<	endl;
+		exit(-1);
+	}
+	sprintf(argument, "-analysis_ch1.intChargeTotal*%f+%f-analysis_ch2.intChargeTotal*%f+%f-analysis_ch3.intChargeTotal*%f+%f", par[0], par[1], par[2], par[3], par[4], par[5]); //adding all the detectors together (we have to pass a string to the Draw() function)
+	TTree *pos;
+	f->GetObject("data;1", pos);
+	pos->Draw(argument, "-analysis_ch1.intChargeTotal<15000 && -analysis_ch2.intChargeTotal<15000 && -analysis_ch3.intChargeTotal<25000");
+	TH1F *posit = (TH1F*)gPad->GetPrimitive("htemp");
+	posit -> GetXaxis() -> SetTitle("Energy [keV]");
+	posit -> GetYaxis() -> SetTitle("Number of events");
+	posit -> SetStats(0);
+	posit -> SetTitle("Positronium, total energy");
+	posit -> SetTitleSize(0.02, "t");
+	posit -> SetFillColorAlpha(kBlue-10, 0.4);
+	board -> SaveAs("Positronium.pdf");
+	cout << "Number of entries: " << posit -> GetEntries() << endl; //extracting the events number
+	f->Close();
+}
+
+void pozitronij()
+{
+	delete gROOT->FindObject("can");
+	TCanvas *grf = new TCanvas("can", "Measurement of energies of gamma rays originating from ortho-positronium annihilation", 0, 0, 1600, 1000);	
+	sodium.name = "22Na.root";
+	Int_t sodfit[] = {6000, 7500, 16000, 18000, 5500, 7500, 15000, 17500, 10500, 13000, 27000, 31000}; //arbitrary data chosen after gleaming the graphs
+	memcpy(sodium.fitData, sodfit, sizeof(sodium.fitData));
+	cesium.name = "137Cs.root";
+	Int_t cesfit[] = {2000, 5000, 8000, 9500, 1700, 3700, 7500, 9500, 3500, 6500, 13000, 16000}; //same as above
+	memcpy(cesium.fitData, cesfit, sizeof(cesium.fitData));
+	Double_t natcal[6];
+	coeff(sodium, natcal);
+	Double_t cezcal[6];
+	coeff(cesium, cezcal);
+	Double_t x[3];
+	Double_t y[3] = {511, 1274.5, 661.7};
+	Double_t param[6];
+	TF1 *f1 = new TF1("f1","[0]*x+[1]",1500,15000);
+	for(int i=0; i<3; i++) //getting the linear coeffs for the calibration
+	{
+		x[0]=natcal[2*i];
+		x[1]=natcal[2*i+1];
+		x[2]=cezcal[2*i+1];
+		TGraph *gr = new TGraph(3, x, y);
+		gr->Draw("ap");
+		gr->Fit("f1", "Q");
+		f1->GetParameters(&param[2*i]);	
+		gr->Delete();
+	}
+	graph(sodium.name, param, grf);
+	graph(cesium.name, param, grf);
+	pgraph("pozitronij.root", param, grf);
+			
+}
