@@ -132,7 +132,7 @@ void pgraph(TString fname, Double_t* par, TCanvas* board) //drawing the final hi
 	f->Close();
 }
 
-void pozitronij()
+void positronium()
 {
 	delete gROOT->FindObject("can");
 	TCanvas *grf = new TCanvas("can", "Measurement of energies of gamma rays originating from ortho-positronium annihilation", 0, 0, 1600, 1000);	
@@ -163,6 +163,6 @@ void pozitronij()
 	}
 	graph(sodium.name, param, grf);
 	graph(cesium.name, param, grf);
-	pgraph("pozitronij.root", param, grf);
+	pgraph("positronium.root", param, grf);
 			
 }
